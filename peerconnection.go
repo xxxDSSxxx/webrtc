@@ -1207,7 +1207,7 @@ func (pc *PeerConnection) handleUnknownSRTP() {
 						// so we're sure all the receivers have been started
 						pc.ops.Done()
 
-						pc.mu.Lock()
+						// pc.mu.Lock()
 						for _, t := range pc.rtpTransceivers {
 							pc.log.Infof("tranceiver mid: %q", t.Mid())
 							if t.Mid() == mid && t.Receiver() != nil && t.Receiver().useRid {
@@ -1218,19 +1218,19 @@ func (pc *PeerConnection) handleUnknownSRTP() {
 
 								delete(pc.pendingReadStreamsSRTP, ssrc)
 
-								// emit onTrack when the first stream has been added
-								if receiver.readyStreams() == 1 {
+								pc.log.Info("Done set rtp stream")
+
+								// emit onTrack when the stream has been added
 									if pc.onTrackHandler != nil {
-										pc.onTrack(receiver.Track(), receiver)
+									pc.onTrack(receiver.Tracks()[rid], receiver)
 									} else {
 										pc.log.Warnf("OnTrack unset, unable to handle incoming media streams")
 									}
-								}
 
 								break
 							}
 						}
-						pc.mu.Unlock()
+						// pc.mu.Unlock()
 
 						return
 					}

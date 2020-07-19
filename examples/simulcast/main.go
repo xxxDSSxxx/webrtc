@@ -2,10 +2,13 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"net/url"
+	"time"
 
+	"github.com/pion/rtcp"
 	"github.com/pion/sdp/v2"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/examples/internal/signal"
@@ -112,40 +115,36 @@ func main() {
 		fmt.Printf("Track has started\n")
 		log.Println("Track has started", track)
 
-		// // Start reading from all the streams and sending them to the related output track
-		// for _, inStream := range track.Streams() {
-		// 	go func(inStream *webrtc.TrackRTPStream) {
-		// 		rid := inStream.RID()
-		// 		go func() {
-		// 			ticker := time.NewTicker(3 * time.Second)
-		// 			for range ticker.C {
-		// 				fmt.Printf("Sending pli for stream with rid: %q, ssrc: %d\n", inStream.RID(), inStream.SSRC())
-		// 				if writeErr := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: inStream.SSRC()}}); writeErr != nil {
-		// 					fmt.Println(writeErr)
-		// 				}
-		// 				// Send a remb message with a very high bandwidth to trigger chrome to send also the high bitrate stream
-		// 				fmt.Printf("Sending remb for stream with rid: %q, ssrc: %d\n", inStream.RID(), inStream.SSRC())
-		// 				if writeErr := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.ReceiverEstimatedMaximumBitrate{Bitrate: 10000000, SenderSSRC: inStream.SSRC()}}); writeErr != nil {
-		// 					fmt.Println(writeErr)
-		// 				}
-		// 			}
-		// 		}()
-		// 		for {
-		// 			var readErr error
-		// 			// Read RTP packets being sent to Pion
-		// 			packet, readErr := inStream.ReadRTP()
-		// 			if err != nil {
-		// 				panic(readErr)
-		// 			}
+		// Start reading from all the streams and sending them to the related output track
+		rid := track.RID()
+		go func() {
+			ticker := time.NewTicker(3 * time.Second)
+			for range ticker.C {
+				fmt.Printf("Sending pli for stream with rid: %q, ssrc: %d\n", track.RID(), track.SSRC())
+				if writeErr := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: track.SSRC()}}); writeErr != nil {
+					fmt.Println(writeErr)
+				}
+				// Send a remb message with a very high bandwidth to trigger chrome to send also the high bitrate stream
+				fmt.Printf("Sending remb for stream with rid: %q, ssrc: %d\n", track.RID(), track.SSRC())
+				if writeErr := peerConnection.WriteRTCP([]rtcp.Packet{&rtcp.ReceiverEstimatedMaximumBitrate{Bitrate: 10000000, SenderSSRC: track.SSRC()}}); writeErr != nil {
+					fmt.Println(writeErr)
+				}
+			}
+		}()
+		for {
+			var readErr error
+			// Read RTP packets being sent to Pion
+			packet, readErr := track.ReadRTP()
+			if err != nil {
+				panic(readErr)
+			}
 
-		// 			packet.SSRC = outputTracks[rid].SSRC()
+			packet.SSRC = outputTracks[rid].SSRC()
 
-		// 			if writeErr := outputTracks[rid].WriteRTP(packet); writeErr != nil && writeErr != io.ErrClosedPipe {
-		// 				panic(writeErr)
-		// 			}
-		// 		}
-		// 	}(inStream)
-		// }
+			if writeErr := outputTracks[rid].WriteRTP(packet); writeErr != nil && writeErr != io.ErrClosedPipe {
+				panic(writeErr)
+			}
+		}
 	})
 	// Set the handler for ICE connection state and update chan if connected
 	peerConnection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {

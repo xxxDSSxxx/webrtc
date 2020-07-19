@@ -185,16 +185,16 @@ func (r *RTPReceiver) ReadStreamID(b []byte, streamID string) (n int, err error)
 	return r.rtpReadStreams[streamID].Read(b)
 }
 
-// ReadRTCP is a convenience method that wraps Read and unmarshals for you
-func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, error) {
-	b := make([]byte, receiveMTU)
-	i, err := r.Read(b)
-	if err != nil {
-		return nil, err
-	}
+// // ReadRTCP is a convenience method that wraps Read and unmarshals for you
+// func (r *RTPReceiver) ReadRTCP() ([]rtcp.Packet, error) {
+// 	b := make([]byte, receiveMTU)
+// 	i, err := r.Read(b)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return rtcp.Unmarshal(b[:i])
-}
+// 	return rtcp.Unmarshal(b[:i])
+// }
 
 // ReadRTCPStreamID is a convenience method that wraps Read and unmarshals for you
 func (r *RTPReceiver) ReadRTCPStreamID(streamID string) ([]rtcp.Packet, error) {
