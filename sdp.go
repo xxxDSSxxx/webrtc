@@ -62,17 +62,12 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 			continue
 		}
 
-		for _, attr := range media.Attributes {
 			var ssrc uint32
-			var midValue string
 
 			msid := ""
 			mstid := ""
 
-			midValue = getMidValue(media)
-			if midValue == "" {
-				continue
-			}
+		for _, attr := range media.Attributes {
 
 			switch attr.Key {
 			case sdp.AttrKeySSRCGroup:
@@ -120,10 +115,10 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 					continue
 				}
 				ssrc = uint32(ssrcI)
-
 				// Plan B might send multiple a=ssrc lines under a single m= section. This is also why a single trackDetails{}
 				// is not defined at the top of the loop over s.MediaDescriptions.
 			}
+		}
 
 			rids := getRids(media)
 			ridKeys := make([]string, 0, len(rids))
@@ -137,17 +132,16 @@ func trackDetailsFromSDP(log logging.LeveledLogger, s *sdp.SessionDescription) m
 			}
 
 			incomingTracks[midValue] = trackDetails{
-				msid:  msid,
-				mstid: mstid,
-				kind:  codecType,
-				label: trackLabel,
-				id:    midValue,
-				ssrc:  ssrc,
-				rids:  ridKeys,
+			msid:   msid,
+			mstid:  mstid,
+			kind:   codecType,
+			label:  trackLabel,
+			id:     midValue,
+			ssrc:   ssrc,
+			rids:   ridKeys,
+			useRid: len(ridKeys) > 0,
 			}
 		}
-	}
-
 	return incomingTracks
 }
 

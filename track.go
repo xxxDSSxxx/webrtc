@@ -21,6 +21,7 @@ const (
 type Track struct {
 	mu sync.RWMutex
 
+	// if rid based it's the rid, it ssrc based it's the ssrc as string
 	id          string
 	payloadType uint8
 	kind        RTPCodecType

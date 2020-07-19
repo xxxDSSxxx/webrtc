@@ -19,7 +19,6 @@ type RTPReceiver struct {
 	kind      RTPCodecType
 	transport *DTLSTransport
 
-	track  *Track
 	tracks map[string]*Track
 
 	closed, initialized chan interface{}
@@ -52,6 +51,7 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 		api:         api,
 		closed:      make(chan interface{}),
 		initialized: make(chan interface{}),
+		tracks:      make(map[string]*Track),
 	}, nil
 }
 
@@ -111,15 +111,9 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 	r.rtpReadStreamsReady = make(map[string]chan struct{})
 	r.rtcpReadStreamsReady = make(map[string]chan struct{})
 
-	r.track = &Track{
-		kind:     r.kind,
-		ssrc:     parameters.Encodings[0].SSRC,
-		receiver: r,
-	}
-
 	for _, enc := range parameters.Encodings {
 		// use the ssrc (since it's fixed) as the stream index
-		streamID := defaultRid //strconv.FormatUint(uint64(enc.SSRC), 10)
+		streamID := enc.ID //strconv.FormatUint(uint64(enc.SSRC), 10)
 		if r.useRid {
 			if enc.RID == "" {
 				return fmt.Errorf("receiver is rid based but encoding doesn't have a rid")
@@ -128,9 +122,10 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 		}
 
 		r.tracks[streamID] = &Track{
-			id:   streamID,
-			rid:  enc.RID,
-			ssrc: enc.SSRC,
+			id:       streamID,
+			rid:      enc.RID,
+			ssrc:     enc.SSRC,
+			receiver: r,
 		}
 
 		r.rtpReadStreamsReady[streamID] = make(chan struct{})
@@ -138,12 +133,21 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 	}
 
 	if !r.useRid {
+		trackID := parameters.Encodings[0].ID
+
+		r.tracks[trackID] = &Track{
+			kind:     r.kind,
+			ssrc:     parameters.Encodings[0].SSRC,
+			id:       parameters.Encodings[0].ID,
+			receiver: r,
+		}
+
 		srtpSession, err := r.transport.getSRTPSession()
 		if err != nil {
 			return err
 		}
 
-		r.rtpReadStreams[defaultRid], err = srtpSession.OpenReadStream(parameters.Encodings[0].SSRC)
+		r.rtpReadStreams[trackID], err = srtpSession.OpenReadStream(parameters.Encodings[0].SSRC)
 		if err != nil {
 			return err
 		}
@@ -153,13 +157,13 @@ func (r *RTPReceiver) Receive(parameters RTPReceiveParameters) error {
 			return err
 		}
 
-		r.rtcpReadStreams[defaultRid], err = srtcpSession.OpenReadStream(parameters.Encodings[0].SSRC)
+		r.rtcpReadStreams[trackID], err = srtcpSession.OpenReadStream(parameters.Encodings[0].SSRC)
 		if err != nil {
 			return err
 		}
 
-		close(r.rtpReadStreamsReady[defaultRid])
-		close(r.rtcpReadStreamsReady[defaultRid])
+		close(r.rtpReadStreamsReady[trackID])
+		close(r.rtcpReadStreamsReady[trackID])
 	}
 
 	return nil
@@ -281,7 +285,7 @@ func (r *RTPReceiver) setRTPReadStream(rs *srtp.ReadStreamSRTP, rid string, ssrc
 	close(r.rtpReadStreamsReady[streamID])
 	close(r.rtcpReadStreamsReady[streamID])
 
-	r.track.mu.Lock()
+	r.tracks[streamID].mu.Lock()
 	r.tracks[streamID].mu.Lock()
 	r.tracks[streamID].ready = true
 	r.tracks[streamID].ssrc = ssrc
@@ -295,5 +299,5 @@ func (r *RTPReceiver) setRTPReadStream(rs *srtp.ReadStreamSRTP, rid string, ssrc
 		track.codec = codec
 		track.mu.Unlock()
 	}
-	r.track.mu.Unlock()
+	r.tracks[streamID].mu.Unlock()
 }

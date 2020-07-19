@@ -6,5 +6,6 @@ package webrtc
 type RTPCodingParameters struct {
 	SSRC        uint32 `json:"ssrc"`
 	RID         string
+	ID          string
 	PayloadType uint8 `json:"payloadType"`
 }

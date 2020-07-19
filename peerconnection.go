@@ -897,7 +897,7 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 			encodings = append(encodings, RTPDecodingParameters{RTPCodingParameters{RID: rid}})
 		}
 	} else {
-		encodings = append(encodings, RTPDecodingParameters{RTPCodingParameters{SSRC: incoming.ssrc}})
+		encodings = append(encodings, RTPDecodingParameters{RTPCodingParameters{SSRC: incoming.ssrc, ID: incoming.id}})
 	}
 
 	err := receiver.Receive(RTPReceiveParameters{
@@ -908,39 +908,44 @@ func (pc *PeerConnection) startReceiver(incoming trackDetails, receiver *RTPRece
 		return
 	}
 
+
+	if !incoming.useRid {
+
 	// set track id and label early so they can be set as new track information
 	// is received from the SDP.
-	receiver.Track().mu.Lock()
-	receiver.Track().id = incoming.id
-	receiver.Track().label = incoming.label
-	receiver.Track().mu.Unlock()
+	trackID := incoming.id
+	receiver.Tracks()[trackID].mu.Lock()
+	receiver.Tracks()[trackID].id = incoming.id
+	receiver.Tracks()[trackID].label = incoming.msid
+	receiver.Tracks()[trackID].mu.Unlock()
 
 	go func() {
-		if err = receiver.Track().determinePayloadType(); err != nil {
-			pc.log.Warnf("Could not determine PayloadType for SSRC %d", receiver.Track().SSRC())
+		if err = receiver.Tracks()[trackID].determinePayloadType(); err != nil {
+			pc.log.Warnf("Could not determine PayloadType for SSRC %d", receiver.Tracks()[trackID].SSRC())
 			return
 		}
 
 		pc.mu.RLock()
 		defer pc.mu.RUnlock()
 
-		codec, err := pc.api.mediaEngine.getCodec(receiver.Track().PayloadType())
+		codec, err := pc.api.mediaEngine.getCodec(receiver.Tracks()[trackID].PayloadType())
 		if err != nil {
-			pc.log.Warnf("no codec could be found for payloadType %d", receiver.Track().PayloadType())
+			pc.log.Warnf("no codec could be found for payloadType %d", receiver.Tracks()[trackID].PayloadType())
 			return
 		}
 
-		receiver.Track().mu.Lock()
-		receiver.Track().kind = codec.Type
-		receiver.Track().codec = codec
-		receiver.Track().mu.Unlock()
+		receiver.Tracks()[trackID].mu.Lock()
+		receiver.Tracks()[trackID].kind = codec.Type
+		receiver.Tracks()[trackID].codec = codec
+		receiver.Tracks()[trackID].mu.Unlock()
 
 		if pc.onTrackHandler != nil {
-			pc.onTrack(receiver.Track(), receiver)
+			pc.onTrack(receiver.Tracks()[trackID], receiver)
 		} else {
 			pc.log.Warnf("OnTrack unset, unable to handle incoming media streams")
 		}
 	}()
+}
 }
 
 // startRTPReceivers opens knows inbound SRTP streams from the RemoteDescription
@@ -977,7 +982,7 @@ func (pc *PeerConnection) startRTPReceivers(incomingTracks map[string]trackDetai
 		for i := range localTransceivers {
 			t := localTransceivers[i]
 
-			if t.Mid() != incoming.mid {
+			if t.Mid() != incoming.id {
 				continue
 			}
 
