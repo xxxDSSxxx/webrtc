@@ -153,7 +153,7 @@ func (t *DTLSTransport) startSRTP() error {
 	}
 
 	srtpConfig := &srtp.Config{
-		Profile:       srtp.ProtectionProfileAes128CmHmacSha1_80,
+		Profile:       srtp.ProtectionProfileAeadAes128Gcm,
 		LoggerFactory: t.api.settingEngine.LoggerFactory,
 	}
 	if t.api.settingEngine.replayProtection.SRTP != nil {
@@ -288,7 +288,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 					Certificate: [][]byte{cert.x509Cert.Raw},
 					PrivateKey:  cert.privateKey,
 				}},
-			SRTPProtectionProfiles: []dtls.SRTPProtectionProfile{dtls.SRTP_AES128_CM_HMAC_SHA1_80},
+			SRTPProtectionProfiles: []dtls.SRTPProtectionProfile{dtls.SRTP_AEAD_AES_128_GCM},
 			ClientAuth:             dtls.RequireAnyClientCert,
 			LoggerFactory:          t.api.settingEngine.LoggerFactory,
 			InsecureSkipVerify:     true,
